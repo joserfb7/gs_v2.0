@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Visualizador SIDC OTAN</title>
+
+  <script src="js/milsymbol.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+
+      background-image:
+        url("img/fondo.png"),
+        url("img/fondo.png");
+
+      background-position:
+        left center,
+        right center;
+
+      background-size:
+        contain,
+        cover;
+
+      background-repeat: 
+        repeat-y,
+        repeat-y;
+      
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .app-window {
+      width: 70vw;
+      min-height: calc(100vh - 40px);
+      background: #f5f5f5;
+      box-shadow: 0 0 25px rgba(0,0,0,0.4);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;      
+    }
+
+    #resultado svg {
+      background: white;
+      padding: 20px;
+      border-radius: 6px;
+    }
+
+    .app-content {
+      position: absolute;
+      top: 390px;
+      bottom: 0px;
+      width: 100%;
+      overflow-y: auto;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+
+      padding-bottom: 50px;
+    }
+
+
+
+    #sidc-viewer {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index:1000;
+      
+      font-family: monospace;
+      font-size: 18px;
+      background: #222;
+      color: #00ffcc;
+      padding: 6px 10px;
+      border-radius: 6px;
+
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    #sidc-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #00ffcc;
+      font-family: monospace;
+      font-size: 18px;
+      width: 320px;
+    }
+   
+    .title-main {
+      margin-top: -15px;
+      font-size: 40px;
+      font-weight: bold;
+      color: #222;
+    }
+
+    .title-sub {
+      margin-top: 4px;
+      font-size: 14px;
+      color: #555;
+    }
+   
+    .identity-separator {
+      width: 300px;
+      height: 2px;
+      background: #bbb;
+      margin: 0 auto 8px auto;
+    }
+
+    /* Etiquetas del titulo del primer bloque */
+    .identity-title {
+      font-size: 20px;
+      color: #444;
+      margin-bottom: 0px;
+    }
+
+
+    /* modifica la sparacion entre label y selector del app-content */  
+    .identity-selectors {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+
+    /* modifica los selectores de la columna derecha */    
+    .identity-selectors select {
+      font-size: 15px;
+      padding: 0px 6px;
+      line-height: 1.2;
+      min-height: 20px;
+    }
+
+    .identity-block {
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    /* Etiquetas del grupo de abajo */
+    .selector-label {
+      font-size: 15px;
+      color: #444;
+      align-self: center;
+    }
+    .app-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 20px 0 10px 0;
+      text-align: center;
+      background: #f5f5f5;
+      z-index: 10;
+    }
+
+    #symbol-viewer {
+      width: 380px;
+      height: 250px;
+      margin: 0 auto; 
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: inset 0 0 6px rgba(0,0,0,0.2);
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Área útil interna (380x250 - 20px) */
+    #resultado {
+      width: calc(100% - 50px);
+      height: calc(100% - 50px);
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* El SVG se escala solo */
+    #resultado svg {
+      width: 100%;
+      height: 100%;
+
+      max-width: 100%;
+      max-height: 100%;
+
+      object-fit: contain;
+    }
+
+
+    #resultado {
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    #resultado.fade-out {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+
+    #resultado.fade-in {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Botones para Descargar archivo SVG y PNG */
+    .identity-selectors button {
+    padding: 6px 12px;
+    font-size: 15px;
+    cursor: pointer;
+    border-radius: 6px;
+    border: 1px solid #888;
+    background: #eee;
+  }
+
+  .identity-selectors button:hover {
+    background: #ddd;
+  }
+
+  .fixed-top {
+    position: sticky;
+    top: 110px; 
+    z-index: 9;
+    background-color: #f5f5f5;
+    padding: 20px 0;
+  }
+
+  .three-columns {
+    display: grid;
+
+    /* (100% - ancho_visualizador) / 2 */
+    grid-template-columns:
+      calc((100% - 400px) / 2)
+      400px
+      calc((100% - 400px) / 2);
+
+    gap: 0px;
+    align-items: start;
+  }
+
+
+  .selector-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .selector-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+
+  /* Etiquetas del primer grupo de selectores <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
+  .selector-item label {
+    margin-bottom: 5px;
+    font-size: 17px;
+    color: #444;
+  }
+
+  .left-column {
+  padding-left: 10px;
+  padding-right: 10px;
+  }
+
+
+  /* modificó el largo del selector(opciones)*/
+  .selector-item select {
+  width: fit-content;
+  min-width: 160px;
+  max-width: 320px;
+  padding: 0px 6px;
+  line-height: 1.2;
+  min-height: 20px;
+  }
+
+  .selector-item {
+    align-items: flex-start;
+  }
+
+  .center-column {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .left-column select {
+    font-size: 17px;
+  }
+
+  .right-column {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .right-column select {
+    font-size: 17px;       /* tamaño inicial */
+    max-width: 320px;
+    width: fit-content;
+    white-space: nowrap;
+  }
+
+
+  .identity-title {
+  font-size: 18px;
+  color: #444;
+  margin-bottom: 5px;
+  }
+
+  .right-column .identity-selectors {
+  justify-content: flex-start;
+  }
+
+  .right-column select {
+  margin-left: 0;
+  }
+
+  .left-column,
+  .right-column {
+    transform: translateY(-10px);
+  }
+
+
+
+    /* ===============================
+      RESPONSIVE - CELULARES
+    ================================ */
+    @media (max-width: 768px) {
+
+      body {
+        align-items: flex-start;
+      }
+
+      .app-content {
+        position: static;
+        padding: 0px 0px 200px;
+      }
+
+
+      /* 🔥 ELIMINAMOS EL GRID DE 3 COLUMNAS */
+      .three-columns {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+
+
+      #symbol-viewer {
+        width: 100%;
+        max-width: 320px;
+        height: 200px;
+        margin: 20px auto;
+      }
+
+      .fixed-top {
+        position: static;
+        padding: 0;
+      }
+
+      .app-header {
+        position: static;
+      }
+
+
+      select {
+        width: 100% !important;
+        max-width: 100%;
+        font-size: 16px;
+      }
+
+
+      #sidc-viewer {
+        position: fixed;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        font-size: 15px;
+      }
+
+      #sidc-input {
+        width: 90%;
+        font-size: 15px;
+      }
+ 
+      .app-window {
+        width: 95vw;
+        min-height: 100vh;
+        border-radius: 0;
+      }
+
+      .title-main {
+        font-size: 26px;
+      }
+
+      .title-sub {
+        font-size: 12px;
+        padding: 0 10px;
+      }
+
+
+      /* 🔥 CLAVE: selectores en columna */
+      .identity-selectors {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .identity-selectors select {
+        width: 100%;
+      }
+
+      .selector-label {
+        text-align: left;
+        font-size: 12px;
+      }
+
+      /* lineas separadoras de bloques en celular */
+      .identity-separator {
+        width: 100%;
+      }
+
+      .left-column.selector-item,
+      .right-column.selector-item {
+        width: 100%;
+        padding-left: 57px;
+        padding-right: 20px;
+        transform: none;
+      }
+
+      .center-column {
+        width: 100%;
+        padding: 0 12px;
+        transform: none;
+      }
+
+
+
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="app-window">
+
+    <!-- HEADER FIJO -->
+    <div class="app-header">
+
+      <div class="title-main">
+        Generador de símbolos <br>conforme el estandár MIL-STD-2525D 
+      </div>
+
+      <div class="title-sub">
+        de SPATIALL ILLUSIONS (MIT license) y adecuado por Bollera
+      </div>
+
+    </div>
+
+    
+    <!-- ZONA FIJA -->
+    <div class="fixed-top">
+
+      <div class="three-columns">
+
+        <!-- IZQUIERDA -->
+        <div class="column left-column">
+
+          <!-- Identidad estándar -->
+          <div class="identity-block">
+            <div class="identity-separator"></div>
+
+            <div class="identity-title">
+              Identidad Estándar:
+            </div>
+
+            <div class="selector-group">
+
+              <div class="selector-item">
+                <label for="context">Contexto:</label>
+                <select id="context">
+                  <option value="" selected disabled>Seleccione…</option>
+                  <option value="0">Realidad</option>
+                  <option value="1">Ejercicio</option>
+                  <option value="2">Simulación</option>
+                </select>
+              </div>
+
+              <div class="selector-item">
+                <label for="identity">Identidad:</label>
+                <select id="identity">
+                  <option value="" selected disabled hidden>Seleccione…</option>
+                  <option value="0">Pendiente</option>
+                  <option value="1">Desconocido</option>
+                  <option value="2">Asumido Amigo</option>
+                  <option value="3">Amigo</option>
+                  <option value="4">Neutral</option>
+                  <option value="5">Sospechoso / Joker</option>
+                  <option value="6">Hostil / Farsante</option>
+                </select>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Estado -->
+          <div class="identity-block">
+            <div class="identity-separator"></div>
+
+            <div class="identity-title">
+              Estado:
+            </div>
+
+            <div class="selector-item">
+              
+              <select id="status">
+                <option value="" selected disabled hidden>Seleccione…</option>
+                <option value="0">Presente</option>
+                <option value="1">Planificado / Anticipado / Sospechoso</option>
+                <option value="2">Presente / Plenamente funcional</option>
+                <option value="3">Presente / Dañado</option>
+                <option value="4">Presente / Destruido</option>
+                <option value="5">Presente / Al máximo de su capacidad</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- CENTRO -->
+        <!-- VISUALIZADOR DE SIMBOLOS -->
+        <div class="column center-column">
+          <div id="symbol-viewer">
+            <div id="resultado"></div>
+          </div>
+        </div>
+
+
+
+
+
+        <!-- DERECHA -->
+        <div class="column right-column">
+          <!-- BLOQUE: CUARTEL GENERAL / GRUPO DE TRABAJO / MANIQUÍ -->
+          <div class="identity-block">
+
+            <div class="identity-separator"></div>
+
+            <div class="identity-title">
+              Ctel. Gral. / Grupo de trabajo / Dummy:
+            </div>
+
+            <div class="identity-selectors">
+              
+
+              <select id="hq">
+                <option value="" selected disabled hidden>Seleccione…</option>
+
+                <option value="0">Desconocido</option>
+                <option value="1">Fingido / Simulacro</option>
+                <option value="2">Cuartel General</option>
+                <option value="3">Cuartel General de Finta / Simulacro</option>
+                <option value="4">Grupo Operativo</option>
+                <option value="5">Grupo Operativo de Finta / Simulacro</option>
+                <option value="6">Cuartel General del Grupo Operativo</option>
+                <option value="7">Cuartel General del Grupo Operativo de Finta <br> / Simulacro</option>
+              </select>
+            </div>
+
+          </div>
+          
+          <!-- BLOQUE: AMPLIFICADORES Y DESCRIPTORES -->
+          <div class="identity-block">
+
+            <div class="identity-separator"></div>
+
+            <div class="identity-title">
+              Amplificadores y descriptores
+            </div>
+
+            <div class="selector-group">
+
+              <div class="selector-item">
+                <label for="echelon">Escalón:</label>
+                <select id="echelon">
+                  <option value="" selected disabled hidden>Seleccione…</option>
+
+                  <option value="00">Desconocido</option>
+                  <option value="11">Equipo / Tripulación</option>
+                  <option value="12">Escuadrón</option>
+                  <option value="13">Sección</option>
+                  <option value="14">Pelotón / Destacamento</option>
+                  <option value="15">Compañía / Batería / Tropa</option>
+                  <option value="16">Batallón / Escuadrón</option>
+                  <option value="17">Regimiento / Grupo</option>
+                  <option value="18">Brigada</option>
+                  <option value="21">División</option>
+                  <option value="22">Cuerpo / MEF</option>
+                  <option value="23">Ejército</option>
+                  <option value="24">Grupo de Ejércitos / Frente</option>
+                  <option value="25">Región / Teatro</option>
+                  <option value="26">Comando</option>
+                </select>
+              </div>
+
+              <div class="selector-item">
+                <label for="mobility">Movilidad del Equipo:</label>
+                <select id="mobility">
+                  <option value="" selected disabled hidden>Seleccione…</option>
+                  <option value="31">Campo a través con ruedas (limitado) (En tierra)</option>
+                  <option value="32">Campo a través con ruedas (En tierra)</option>
+                  <option value="33">Orugas (En tierra)</option>
+                  <option value="34">Combinación de ruedas y orugas (En tierra)</option>
+                  <option value="35">Remolcado (En tierra)</option>
+                  <option value="36">Carril (En tierra)</option>
+                  <option value="37">Animales de carga (En tierra)</option>
+              
+                  <option value="41">Sobre nieve (vehículo motriz)</option>
+                  <option value="42">Trineo (En Nieve)</option>
+                
+                  <option value="51">Barcaza (En agua)</option>
+                  <option value="52">Anfibio (En agua)</option>
+
+                  <option value="61">Conjunto remolcado naval corto</option>
+                  <option value="62">Conjunto remolcado naval largo</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+<!-- CONTENIDO SCROLLEABLE -->
+    <div class="app-content">
+      
+      
+
+      
+      
+       
+
+
+    <!-- BLOQUE: CONJUNTO DE SÍMBOLOS -->
+    <div class="identity-block">
+
+      <div class="identity-separator"></div>
+
+      <div class="identity-title">
+        Conjunto de Símbolos:
+      </div>
+
+      <div class="identity-selectors">
+        <span class="selector-label">Descripción:</span>
+
+        <select id="symbol-set">
+          <option value="" selected disabled hidden>Seleccione…</option>
+          <option value="00">Desconocido</option>
+          <option value="01">Aire</option>
+          <option value="02">Aire (misil)</option>
+          <option value="05">Espacio</option>
+          <option value="06">Espacio (misil)</option>
+          <option value="10">Unidad de Tierra</option>
+          <option value="11">Unidad de Tierra Civil / Organización</option>
+          <option value="15">Equipo Terrestre</option>
+          <option value="20">Instalación de Tierra</option>
+          <option value="25">Medidas de Control</option>
+          <option value="30">Superficie de mar</option>
+          <option value="35">Subsuelo de mar</option>
+          <option value="36">Guerra de minas</option>
+          <option value="40">Actividades</option>
+          <option value="45">Atmosférico</option>
+          <option value="46">Oceanográfico</option>
+          <option value="47">Espacio Meteorológico</option>
+          <option value="50">Inteligencia de señales Espacio</option>
+          <option value="51">Inteligencia de señales Aéreo</option>
+          <option value="52">Inteligencia de señales Terrestre</option>
+          <option value="53">Inteligencia de señales Superficie</option>
+          <option value="54">Inteligencia de señales Subsuelo</option>
+          <option value="60">Ciberespacio</option>
+        </select>
+      </div>
+
+    </div>
+
+
+
+
+
+
+  
+
+
+      <!-- BLOQUE: DESCARGA DEL SÍMBOLO -->
+      <div class="identity-block">
+
+        <div class="identity-separator"></div>
+
+        <div class="identity-title">
+          Descargar símbolo
+        </div>
+
+        <div class="identity-selectors">
+          <button id="download-svg">Descargar SVG</button>
+          <button id="download-png">Descargar PNG</button>
+        </div>
+
+      </div>
+
+
+
+</div>
+
+
+
+  <!-- SIDC FIJO -->
+  <div id="sidc-viewer">
+    SIDC:
+    <input
+      id="sidc-input"
+      type="text"
+      maxlength="30"
+      placeholder="Pegue SIDC y presione Enter"
+    >
+  </div>
+
+</div>
+
+  <script src="app.js"></script>
+
+</body>
+</html>
