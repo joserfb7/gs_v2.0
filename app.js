@@ -1,4 +1,7 @@
 // Referencia global al input SIDC
+let symbolOptions = {};
+
+
 let sidcInput;
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -12,6 +15,16 @@ window.addEventListener("DOMContentLoaded", () => {
   const hqSelect = document.getElementById("hq");
   const echelonSelect = document.getElementById("echelon");  
   const mobilitySelect = document.getElementById("mobility");
+
+  const iconSelect = document.getElementById("icon-selector");
+
+  iconSelect.addEventListener("change", () => {
+    const iconCode = iconSelect.value;
+    if (!iconCode || iconCode.length !== 6) return;
+
+    actualizarIconoSIDC(iconCode);
+  });
+
 
 
 
@@ -67,6 +80,95 @@ window.addEventListener("DOMContentLoaded", () => {
   // Dibujar símbolo inicial
   dibujarSIDC();
 });
+
+document.getElementById("btn-agregar").addEventListener("click", () => {
+
+  symbolOptions = {
+    size: 100,
+    frame: true,
+    padding: 20
+  };
+
+
+  
+
+  // W – Fecha / Hora
+  const w = document.getElementById("amp-w")?.value.trim();
+  if (w) symbolOptions.dtg = w.toUpperCase();
+
+  // X – Altitud / profundidad
+  const x = document.getElementById("amp-x")?.value.trim();
+  if (x) symbolOptions.altitudeDepth = x;
+
+  // Y – Ubicación
+  const y = document.getElementById("amp-y")?.value.trim();
+  if (y) symbolOptions.location = y.toUpperCase();
+
+  // V – Tipo de equipo
+  const v = document.getElementById("amp-v")?.value.trim();
+  if (v) symbolOptions.type = v.toUpperCase();
+
+  // AD – Plataforma
+  const ad = document.getElementById("amp-ad")?.value.trim();
+  if (ad) symbolOptions.platformType = ad.toUpperCase();
+
+  // AE – Tiempo desmontaje
+  const ae = document.getElementById("amp-ae")?.value.trim();
+  if (ae) symbolOptions.equipmentTeardownTime = ae;
+
+  // T – Designación única (AMPLIFICADOR CLAVE)
+  const t = document.getElementById("amp-t")?.value.trim();
+  if (t) symbolOptions.uniqueDesignation = t.toUpperCase();
+
+  // Z – Velocidad
+  const z = document.getElementById("amp-z")?.value.trim();
+  if (z) symbolOptions.speed = z;
+
+  // G – Comentarios del personal
+  const g = document.getElementById("amp-g")?.value.trim();
+  if (g) symbolOptions.staffComments = g.toUpperCase();
+
+  // H – Información adicional
+  const h = document.getElementById("amp-h")?.value.trim();
+  if (h) symbolOptions.additionalInformation = h.toUpperCase();
+
+  // AF – Identificador común
+  const af = document.getElementById("amp-af")?.value.trim();
+  if (af) symbolOptions.commonIdentifier = af.toUpperCase();
+
+  // M – Formación superior
+  const m = document.getElementById("amp-m")?.value.trim();
+  if (m) symbolOptions.higherFormation = m.toUpperCase();
+
+  // F – Reforzado / reducido
+  const f = document.getElementById("amp-f")?.value;
+  if (f) symbolOptions.reinforcedReduced = f;
+
+  // J – Evaluación
+  const j = document.getElementById("amp-j")?.value;
+  if (j) symbolOptions.evaluationRating = j;
+
+  // K – Eficacia combate
+  const k = document.getElementById("amp-k")?.value;
+  if (k) symbolOptions.combatEffectiveness = k;
+
+  // L – Firma electrónica
+  const l = document.getElementById("amp-l")?.value;
+  if (l) symbolOptions.signatureEquipment = l;
+
+  // N – Equipo enemigo
+  const n = document.getElementById("amp-n")?.value;
+  if (n) symbolOptions.hostile = n;
+
+  // P – Prioridad visualización
+  const p = document.getElementById("amp-p")?.value;
+  if (p) symbolOptions.iffSif = p;
+
+  console.log("symbolOptions final:", symbolOptions);
+
+  dibujarSIDC();
+});
+
 
 
 
@@ -137,7 +239,15 @@ function dibujarSIDC() {
     contenedor.classList.add("fade-out");
 
     setTimeout(() => {
-      const symbol = new ms.Symbol(sidc, { size: 100 });
+
+      
+
+      // ✅ Crear símbolo con SIDC + amplificadores
+      const symbol = new ms.Symbol(sidc, symbolOptions);
+      
+      
+
+
 
       // 3️⃣ Reemplazar SVG
       contenedor.innerHTML = symbol.asSVG();
@@ -262,3 +372,37 @@ document.querySelectorAll(".right-column select").forEach(select => {
   });
 });
 
+
+
+
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+
+    document.querySelectorAll(".tab").forEach(t =>
+      t.classList.remove("active")
+    );
+
+    document.querySelectorAll(".tab-content").forEach(c =>
+      c.classList.remove("active")
+    );
+
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.tab).classList.add("active");
+  });
+});
+
+function actualizarIconoSIDC(iconCode) {
+  let sidc = sidcInput.value.trim();
+  if (!/^[0-9]{30}$/.test(sidc)) return;
+
+  let sidcArray = sidc.split("");
+
+  // Icono funcional: posiciones 10 a 15
+  for (let i = 0; i < 6; i++) {
+    sidcArray[10 + i] = iconCode[i];
+  }
+
+  sidcInput.value = sidcArray.join("");
+  dibujarSIDC();
+}
