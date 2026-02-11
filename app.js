@@ -1,266 +1,449 @@
-// Referencia global al input SIDC
-let symbolOptions = {};
+const SIDCModel = (() => {
+
+  moverVisualizadorASlotActivo();
 
 
-let sidcInput;
+  let value = "130310000000000000000000000000";
 
-window.addEventListener("DOMContentLoaded", () => {
+  function isValid(sidc) {
+    return /^[0-9]{30}$/.test(sidc);
+  }
 
-  // Elementos del DOM (se buscan UNA sola vez)
-  sidcInput = document.getElementById("sidc-input");
-  const contextSelect = document.getElementById("context");
-  const identitySelect = document.getElementById("identity");
-  const symbolSetSelect = document.getElementById("symbol-set");
-  const statusSelect = document.getElementById("status");
-  const hqSelect = document.getElementById("hq");
-  const echelonSelect = document.getElementById("echelon");  
-  const mobilitySelect = document.getElementById("mobility");
+  function get() {
+    return value;
+  }
 
-  const iconSelect = document.getElementById("icon-selector");
-
-  iconSelect.addEventListener("change", () => {
-    const iconCode = iconSelect.value;
-    if (!iconCode || iconCode.length !== 6) return;
-
-    actualizarIconoSIDC(iconCode);
-  });
-
-
-
-
-  // SIDC por defecto al iniciar
-  sidcInput.value = "130310000000000000000000000000";
-
-  // Enter manual en SIDC
-  sidcInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      dibujarSIDC();
+  function set(newSIDC) {
+    if (isValid(newSIDC)) {
+      value = newSIDC;
+      return true;
     }
-  });
+    return false;
+  }
 
-  // Contexto → 3er dígito (posición 2)
-  contextSelect.addEventListener("change", () => {
-    actualizarDigitoSIDC(2, contextSelect.value);
-  });
+  function setDigit(pos, digit) {
+    if (!isValid(value)) return;
+    const arr = value.split("");
+    arr[pos] = digit;
+    value = arr.join("");
+  }
 
-  // Identidad → 4º dígito (posición 3)
-  identitySelect.addEventListener("change", () => {
-    actualizarDigitoSIDC(3, identitySelect.value);
-  });
+  function setTwoDigits(pos, twoDigits) {
+    if (!isValid(value) || twoDigits.length !== 2) return;
+    const arr = value.split("");
+    arr[pos]     = twoDigits[0];
+    arr[pos + 1] = twoDigits[1];
+    value = arr.join("");
+  }
 
-  // Conjunto de símbolos → dígitos 4 y 5 (posiciones 3 y 4)
-  symbolSetSelect.addEventListener("change", () => {
-    actualizarDosDigitosSIDC(4, symbolSetSelect.value);
-  });
+  function setIcon(iconCode) {
+    if (!isValid(value) || iconCode.length !== 6) return;
+    const arr = value.split("");
+    for (let i = 0; i < 6; i++) {
+      arr[10 + i] = iconCode[i];
+    }
+    value = arr.join("");
+  }
 
-  // Estatus → 7º dígito (posición 6)
-  statusSelect.addEventListener("change", () => {
-    actualizarDigitoSIDC(6, statusSelect.value);
-  });
+  function read(pos, len = 1) {
+    return value.substring(pos, pos + len);
+  }
 
-  // Cuartel General / Grupo Operativo → 8º dígito (posición 7)
-  hqSelect.addEventListener("change", () => {
-    actualizarDigitoSIDC(7, hqSelect.value);
-  });
+  return {
+    get,
+    set,
+    setDigit,
+    setTwoDigits,
+    setIcon,
+    read,
+    isValid
+  };
 
-  // Escalón (Amplificadores) → dígitos 9 y 10 (posiciones 8 y 9)
-  echelonSelect.addEventListener("change", () => {
-    mobilitySelect.value = "";    
-    actualizarDosDigitosSIDC(8, echelonSelect.value);
-  });
-
-  // Movilidad del equipo en tierra → dígitos 9 y 10 (8 y 9)
-  mobilitySelect.addEventListener("change", () => {
-    echelonSelect.value = "";
-    actualizarDosDigitosSIDC(8, mobilitySelect.value);
-  });
+})();
 
 
 
-  // Dibujar símbolo inicial
-  dibujarSIDC();
-});
+const SymbolController = (() => {
 
-document.getElementById("btn-agregar").addEventListener("click", () => {
-
-  symbolOptions = {
-    size: 100,
+  const options = {
     frame: true,
     padding: 20
   };
 
+  const container = document.getElementById("resultado");
 
-  
+  function updateOption(key, value) {
+    if (value) options[key] = value;
+    else delete options[key];
+  }
 
-  // W – Fecha / Hora
-  const w = document.getElementById("amp-w")?.value.trim();
-  if (w) symbolOptions.dtg = w.toUpperCase();
+  function render() {
+    const sidc = SIDCModel.get();
+    if (!SIDCModel.isValid(sidc)) return;
 
-  // X – Altitud / profundidad
-  const x = document.getElementById("amp-x")?.value.trim();
-  if (x) symbolOptions.altitudeDepth = x;
+    try {
+      container.classList.remove("fade-in", "fade-out");
+      void container.offsetWidth;
+      container.classList.add("fade-out");
 
-  // Y – Ubicación
-  const y = document.getElementById("amp-y")?.value.trim();
-  if (y) symbolOptions.location = y.toUpperCase();
+      setTimeout(() => {
+        const symbol = new ms.Symbol(sidc, options);
+        container.innerHTML = symbol.asSVG();
+        container.classList.remove("fade-out");
+        container.classList.add("fade-in");
+      }, 150);
 
-  // V – Tipo de equipo
-  const v = document.getElementById("amp-v")?.value.trim();
-  if (v) symbolOptions.type = v.toUpperCase();
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
-  // AD – Plataforma
-  const ad = document.getElementById("amp-ad")?.value.trim();
-  if (ad) symbolOptions.platformType = ad.toUpperCase();
+  return {
+    render,
+    updateOption
+  };
 
-  // AE – Tiempo desmontaje
-  const ae = document.getElementById("amp-ae")?.value.trim();
-  if (ae) symbolOptions.equipmentTeardownTime = ae;
+})();
 
-  // T – Designación única (AMPLIFICADOR CLAVE)
-  const t = document.getElementById("amp-t")?.value.trim();
-  if (t) symbolOptions.uniqueDesignation = t.toUpperCase();
 
-  // Z – Velocidad
-  const z = document.getElementById("amp-z")?.value.trim();
-  if (z) symbolOptions.speed = z;
 
-  // G – Comentarios del personal
-  const g = document.getElementById("amp-g")?.value.trim();
-  if (g) symbolOptions.staffComments = g.toUpperCase();
+const UIController = (() => {
 
-  // H – Información adicional
-  const h = document.getElementById("amp-h")?.value.trim();
-  if (h) symbolOptions.additionalInformation = h.toUpperCase();
+  const sidcInput = document.getElementById("sidc-input");
 
-  // AF – Identificador común
-  const af = document.getElementById("amp-af")?.value.trim();
-  if (af) symbolOptions.commonIdentifier = af.toUpperCase();
+  function bindSelect(id, callback) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("change", e => callback(e.target.value));
+  }
 
-  // M – Formación superior
-  const m = document.getElementById("amp-m")?.value.trim();
-  if (m) symbolOptions.higherFormation = m.toUpperCase();
+  function bindInput(id, callback) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", e => callback(e.target.value));
+  }
 
-  // F – Reforzado / reducido
-  const f = document.getElementById("amp-f")?.value;
-  if (f) symbolOptions.reinforcedReduced = f;
+  function syncSIDCToUI() {
+    sidcInput.value = SIDCModel.get();
+  }
 
-  // J – Evaluación
-  const j = document.getElementById("amp-j")?.value;
-  if (j) symbolOptions.evaluationRating = j;
+  function syncUIFromSIDC() {
+    setSelect("context", SIDCModel.read(2));
+    setSelect("identity", SIDCModel.read(3));
 
-  // K – Eficacia combate
-  const k = document.getElementById("amp-k")?.value;
-  if (k) symbolOptions.combatEffectiveness = k;
+    const echelon = SIDCModel.read(8, 2);
+    if (document.querySelector(`#escalon option[value="${echelon}"]`)) {
+      setSelect("escalon", echelon);
+      setSelect("amp-r", "");
+    } else {
+      setSelect("amp-r", echelon);
+      setSelect("escalon", "");
+    }
 
-  // L – Firma electrónica
-  const l = document.getElementById("amp-l")?.value;
-  if (l) symbolOptions.signatureEquipment = l;
+    setSelect("icon-selector", SIDCModel.read(10, 6));
+  }
 
-  // N – Equipo enemigo
-  const n = document.getElementById("amp-n")?.value;
-  if (n) symbolOptions.hostile = n;
+  function setSelect(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = el.querySelector(`option[value="${value}"]`) ? value : "";
+  }
 
-  // P – Prioridad visualización
-  const p = document.getElementById("amp-p")?.value;
-  if (p) symbolOptions.iffSif = p;
+  function init() {
 
-  console.log("symbolOptions final:", symbolOptions);
+    bindAmplifiers();
 
-  dibujarSIDC();
+    function setSymbolSetFromTab(tabId) {
+      // tab-10 → ["tab-10", "10"]
+      const match = tabId.match(/tab-(\d{2})/);
+      if (!match) return;
+
+      const setCode = match[1]; // "00", "10", "25", etc.
+
+      // Escribe en posiciones 4 y 5
+      SIDCModel.setTwoDigits(4, setCode);
+
+      bindAmplifiers();
+
+      syncSIDCToUI();
+      SymbolController.render();
+    }
+
+
+    // SIDC manual
+    sidcInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        SIDCModel.set(sidcInput.value.trim());
+        syncUIFromSIDC();
+        SymbolController.render();
+      }
+    });
+
+    // CONTEXTO
+    bindSelect("context", v => {
+      SIDCModel.setDigit(2, v);
+      syncSIDCToUI();
+      SymbolController.render();
+    });
+
+    // IDENTIDAD
+    bindSelect("identity", v => {
+      SIDCModel.setDigit(3, v);
+      syncSIDCToUI();
+      SymbolController.render();
+    });
+
+
+
+    // ICONO
+    bindSelect("icon-selector", v => {
+      SIDCModel.setIcon(v);
+      syncSIDCToUI();
+      SymbolController.render();
+    });
+
+    // MODIFICADOR 1 (SIDC 16–17)
+    bindSelect("modifier-1", v => {
+      const activeTab = document.querySelector(".tab-content.active");
+      const el = document.getElementById("modifier-1");
+
+      // seguridad: solo si está en la pestaña activa
+      if (!activeTab || !activeTab.contains(el)) return;
+
+      updateModifier1(v);
+    });
+
+    // MODIFICADOR 2 (SIDC 18–19)
+    bindSelect("modifier-2", v => {
+      const activeTab = document.querySelector(".tab-content.active");
+      const el = document.getElementById("modifier-2");
+
+      // Seguridad: solo si está en la pestaña activa
+      if (!activeTab || !activeTab.contains(el)) return;
+
+      updateModifier2(v);
+    });
+
+
+    // J — CALIFICACIÓN DE LA EVALUACIÓN
+    bindInput("amp-j-source", updateJ);
+    bindInput("amp-j-cred", updateJ);
+
+    function updateJ() {
+      const s = document.getElementById("amp-j-source")?.value || "";
+      const c = document.getElementById("amp-j-cred")?.value || "";
+
+      SymbolController.updateOption(
+        "evaluationRating",
+        (s && c) ? (s + c).toUpperCase() : null
+      );
+
+      SymbolController.render();
+    }
+
+    // F — REFORZADO / REDUCIDO
+    bindSelect("amp-f", v => {
+      if (v === "none" || v === "") {
+        SymbolController.updateOption("reinforcedReduced", null);
+      } else {
+        SymbolController.updateOption("reinforcedReduced", v);
+      }
+      SymbolController.render();
+    });
+
+    // K — EFICACIA DEL COMBATE
+    bindSelect("amp-k", v => {
+      if (v === "none" || v === "") {
+        SymbolController.updateOption("combatEffectiveness", null);
+      } else {
+        SymbolController.updateOption("combatEffectiveness", v);
+      }
+      SymbolController.render();
+    });
+
+    /* L — FIRMA ELECTRÓNICA DETECTABLE
+    bindSelect("amp-l", v => {
+      if (v === "none" || v === "") {
+        SymbolController.updateOption("electronicSignature", null);
+      } else {
+        SymbolController.updateOption("electronicSignature", v);
+      }
+      SymbolController.render();
+    }); */
+
+    // N — EQUIPO ENEMIGO
+ /* bindSelect("amp-n", v => {
+      if (v === "none" || v === "") {
+        SymbolController.updateOption("additionalInformation", null);
+      } else {
+        const map = {
+          armor: "EQ ENE BLINDADO",
+          antiArmor: "EQ ENE ANTIBLIND",
+          airDefense: "EQ ENE DEF AÉREA",
+          artillery: "EQ ENE ARTILLERÍA",
+          ew: "EQ ENE EW",
+          uav: "EQ ENE UAV",
+          ied: "EQ ENE IED",
+          missile: "EQ ENE MISILES",
+          naval: "EQ ENE NAVAL"
+        };
+
+        SymbolController.updateOption("additionalInformation", map[v]);
+      }
+      SymbolController.render();
+    }); */
+
+    // P — PRIORIDAD DE VISUALIZACIÓN
+  /*bindSelect("amp-p", v => {
+      if (v === "none" || v === "") {
+        SymbolController.updateOption("strokeWidth", null);
+        SymbolController.updateOption("outlineColor", null);
+      } else {
+        const map = {
+          low:      { strokeWidth: 1, outlineColor: "#777" },
+          medium:   { strokeWidth: 2, outlineColor: "#ffa500" },
+          high:     { strokeWidth: 3, outlineColor: "#ff0000" },
+          critical: { strokeWidth: 4, outlineColor: "#ff00ff" }
+        };
+
+        const cfg = map[v];
+        SymbolController.updateOption("strokeWidth", cfg.strokeWidth);
+        SymbolController.updateOption("outlineColor", cfg.outlineColor);
+      }
+      SymbolController.render();
+    }); */
+
+
+
+    document.querySelectorAll("input, select").forEach(el => {
+      el.addEventListener("change", SymbolController.render);
+      el.addEventListener("input", SymbolController.render);
+    });
+
+    // =========================
+    // VISUALIZADOR
+    // =========================
+
+    const btnVis = document.getElementById("btn-visualizador");
+    const modal = document.getElementById("visualizador-modal");
+    const modalImg = document.getElementById("modal-img");
+    const previewImg = document.getElementById("preview-img");
+    const closeBtn = document.getElementById("visualizador-close");
+
+    const visualizadorImgs = {
+      "tab-00": "img/default.png",
+      "tab-01": "img/aire.png",
+      "tab-02": "img/aire-misil.png",
+      "tab-05": "img/espacio.png",
+      "tab-06": "img/espacio-misil.png",
+      "tab-10": "img/unidad de tierra.png",
+
+      default: "img/default.png"
+    };
+
+    let pestañaActual = "tab-10";
+
+        function setVisualizador(tab) {
+          pestañaActual = tab;
+          const img = visualizadorImgs[tab] || visualizadorImgs.default;
+          previewImg.src = img;
+          modalImg.src = img;
+        }
+
+        document.querySelectorAll(".tab").forEach(tabBtn => {
+          tabBtn.addEventListener("click", () => {
+            const tabId = tabBtn.dataset.tab;
+
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            tabBtn.classList.add("active");
+
+            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+            const content = document.getElementById(tabId);
+            if (content) content.classList.add("active");
+
+            resetearFormulario();
+
+            SIDCModel.set("130310000000000000000000000000");
+
+            setVisualizador(tabId);
+            setSymbolSetFromTab(tabId);
+
+            syncSIDCToUI();
+            SymbolController.render();
+            moverVisualizadorASlotActivo();
+
+            tabBtn.scrollIntoView({
+              behavior: "smooth",
+              inline: "center",
+              block: "nearest"
+            });
+
+            [
+              "uniqueDesignation",
+              "speed",
+              "altitudeDepth",
+              "location",
+              "quantity",
+              "direction",
+              "staffComments",
+              "additionalInformation",
+              "evaluationRating",
+              "combatEffectiveness",
+              "reinforcedReduced",
+              "engagementBar",
+              "type",
+              "dtg",
+              "platformType",
+              "equipmentTeardownTime",
+              "commonIdentifier",
+              "higherFormation"
+
+            ].forEach(opt => SymbolController.updateOption(opt, null));
+
+          });
+        });
+
+
+        btnVis?.addEventListener("click", () => modal.style.display = "block");
+        closeBtn?.addEventListener("click", () => modal.style.display = "none");
+        modal?.addEventListener("click", e => { if(e.target===modal) modal.style.display="none"; });
+
+        
+
+        // Inicializa visualizador con tab-10
+        setVisualizador("tab-10");
+
+        // Render inicial
+        syncSIDCToUI();
+        SymbolController.render();
+      }
+
+      return {
+        init,
+        syncSIDCToUI,  // <-- Añadir esto para que sea accesible desde fuera
+        syncUIFromSIDC,
+        setSelect
+      };
+      
+
+      
+})();
+
+
+
+window.addEventListener("DOMContentLoaded", () => {
+  UIController.init();
 });
 
 
+function moverVisualizadorASlotActivo() {
+  const slot = document.querySelector(
+    ".tab-content.active [data-slot='center']"
+  );
+  const visualizador = document.getElementById("center-slot");
 
-
-
-
-
-/* ===============================
-   MODIFICAR UN DÍGITO DEL SIDC
-================================ */
-function actualizarDigitoSIDC(posicion, nuevoValor) {
-  let sidc = sidcInput.value.trim();
-
-  // seguridad: SIDC siempre de 30 dígitos
-  if (!/^[0-9]{30}$/.test(sidc)) return;
-
-  let sidcArray = sidc.split("");
-  sidcArray[posicion] = nuevoValor;
-
-  sidcInput.value = sidcArray.join("");
-
-  dibujarSIDC();
-}
-
-
-
-
-
-
-/* ===============================
-   MODIFICAR DOS DÍGITOS DEL SIDC
-================================ */
-function actualizarDosDigitosSIDC(posicion, valor2Digitos) {
-  let sidc = sidcInput.value.trim();
-
-  if (!/^[0-9]{30}$/.test(sidc)) return;
-
-  let sidcArray = sidc.split("");
-  sidcArray[posicion] = valor2Digitos[0];
-  sidcArray[posicion + 1] = valor2Digitos[1];
-
-  sidcInput.value = sidcArray.join("");
-
-  dibujarSIDC();
-}
-
-
-
-
-
-
-/* ===============================
-   DIBUJAR DESDE SIDC
-================================ */
-function dibujarSIDC() {
-  const sidc = sidcInput.value.trim();
-  const contenedor = document.getElementById("resultado");
-
-  if (!/^[0-9]{30}$/.test(sidc)) return;
-
-  try {
-    // 1️⃣ Reset completo de animación
-    contenedor.classList.remove("fade-in", "fade-out");
-
-    // ⚠️ Forzar reflow (clave)
-    void contenedor.offsetWidth;
-
-    // 2️⃣ Fade-out
-    contenedor.classList.add("fade-out");
-
-    setTimeout(() => {
-
-      
-
-      // ✅ Crear símbolo con SIDC + amplificadores
-      const symbol = new ms.Symbol(sidc, symbolOptions);
-      
-      
-
-
-
-      // 3️⃣ Reemplazar SVG
-      contenedor.innerHTML = symbol.asSVG();
-
-      // 4️⃣ Fade-in
-      contenedor.classList.remove("fade-out");
-      contenedor.classList.add("fade-in");
-
-    }, 200);
-
-  } catch (error) {
-    console.error(error);
-    alert("El SIDC es válido, pero no pudo ser interpretado por milsymbol");
+  if (slot && visualizador && !slot.contains(visualizador)) {
+    slot.appendChild(visualizador);
   }
 }
 
@@ -268,7 +451,196 @@ function dibujarSIDC() {
 
 
 
+function bindAmplifiers() {
+  document.addEventListener("input", e => {
+    const el = e.target;
+    if (!el.dataset.amp) return;
 
+    const activeTab = document.querySelector(".tab-content.active");
+    if (!activeTab || !activeTab.contains(el)) return;
+
+    handleAmplifier(el.dataset.amp, el.value);
+  });
+
+  document.addEventListener("change", e => {
+    const el = e.target;
+    if (!el.dataset.amp) return;
+
+    const activeTab = document.querySelector(".tab-content.active");
+    if (!activeTab || !activeTab.contains(el)) return;
+
+    handleAmplifier(el.dataset.amp, el.value);
+  });
+}
+
+
+function handleAmplifier(code, value) {
+  switch (code) {
+
+    case "b": // ESCALÓN
+      if (value === "" || value === "none") {
+        SIDCModel.setTwoDigits(8, "00");
+      } else {
+        SIDCModel.setTwoDigits(8, value);
+      }
+
+      // 🔁 Reiniciar visualmente R
+      resetSelectToPlaceholder("amp-r");
+
+      break;
+
+    case "c":
+      SymbolController.updateOption("quantity", value);
+      break;
+
+    case "d":
+      SIDCModel.setDigit(7, value === "" || value === "none" ? "0" : value);
+
+      resetSelectToPlaceholder("amp-s");
+      break;
+
+
+
+    case "g":
+      SymbolController.updateOption("staffComments", value);
+      break;
+
+    case "h":
+      SymbolController.updateOption("additionalInformation", value);
+      break;
+
+    case "m":
+      SymbolController.updateOption("higherFormation", value.trim().toUpperCase());
+    break;
+
+    case "q":
+      SymbolController.updateOption("direction", value);
+      break;
+
+    case "r": // MOVILIDAD
+      if (value === "" || value === "none") {
+        SIDCModel.setTwoDigits(8, "00");
+      } else {
+        SIDCModel.setTwoDigits(8, value);
+      }
+
+      // 🔁 Reiniciar visualmente B
+      resetSelectToPlaceholder("amp-b");
+
+      break;
+
+
+    case "s":
+      SIDCModel.setDigit(7, value === "" || value === "none" ? "0" : value);
+
+      resetSelectToPlaceholder("amp-d");
+      break;
+
+
+
+    case "t":
+      SymbolController.updateOption("uniqueDesignation", value.toUpperCase());
+      break;
+
+    case "v":
+      SymbolController.updateOption("type", value.trim());
+      break;
+
+    case "w":
+      SymbolController.updateOption("dtg", value.toUpperCase());
+      break;
+
+    case "x":
+      SymbolController.updateOption("altitudeDepth", value);
+      break;
+
+    case "y":
+      SymbolController.updateOption("location", value.toUpperCase());
+      break;
+
+    case "z":
+      SymbolController.updateOption("speed", value);
+      break;
+
+    case "ad":
+      SymbolController.updateOption("platformType", value.trim());
+      break;
+
+    case "ae":
+      SymbolController.updateOption("equipmentTeardownTime", value.trim());
+      break;
+
+    case "af":
+      SymbolController.updateOption("commonIdentifier", value.trim().toUpperCase());
+    break;
+
+    case "al":
+      SIDCModel.setDigit(6, value);
+      break;
+
+    case "ao":
+      SymbolController.updateOption(
+        "engagementBar",
+        value === "" || value === "none" ? null : value
+      );
+      break;
+
+    case "m1": // Modificador 1
+      if (value === "" || value === "none") {
+        SIDCModel.setTwoDigits(16, "00");
+      } else {
+        SIDCModel.setTwoDigits(16, value);
+      }
+      break;
+
+    case "m2": // Modificador 2
+      if (value === "" || value === "none") {
+        SIDCModel.setTwoDigits(18, "00");
+      } else {
+        SIDCModel.setTwoDigits(18, value);
+      }
+      break;
+
+    case "icon":
+      if (value === "" || value === "none") {
+        SIDCModel.setIcon("000000"); // Icono por defecto fijo
+      } else {
+        SIDCModel.setIcon(value);
+      }
+      break;
+  
+
+  }
+
+  syncSIDCToUI();
+  SymbolController.render();
+}
+
+
+function resetearFormulario() {
+  // Reiniciar todos los inputs de texto
+  document.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => {
+    input.value = '';
+  });
+
+  // Reiniciar todos los selects a su valor por defecto
+  document.querySelectorAll('select').forEach(select => {
+    // Intentar establecer valor vacío o "none" si existe
+    if (select.querySelector('option[value=""]')) {
+      select.value = '';
+    } else if (select.querySelector('option[value="none"]')) {
+      select.value = 'none';
+    } else {
+      // Si no hay opción vacía, ir a la primera
+      select.selectedIndex = 0;
+    }
+  });
+
+  // Reiniciar los checkboxes y radios
+  document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(input => {
+    input.checked = false;
+  });
+}
 
 document.getElementById("download-svg").addEventListener("click", () => {
   const svgElement = document.querySelector("#resultado svg");
@@ -291,7 +663,13 @@ document.getElementById("download-svg").addEventListener("click", () => {
 
 document.getElementById("download-png").addEventListener("click", () => {
   const svgElement = document.querySelector("#resultado svg");
-  if (!svgElement) return alert("No hay símbolo para descargar");
+  if (!svgElement) {
+    alert("No hay símbolo para descargar");
+    return;
+  }
+
+  const scale = 4;              // 🔹 2 o 4
+  const background = "white";   // 🔹 "white" | "transparent"
 
   const serializer = new XMLSerializer();
   const svgString = serializer.serializeToString(svgElement);
@@ -300,14 +678,22 @@ document.getElementById("download-png").addEventListener("click", () => {
   const ctx = canvas.getContext("2d");
 
   const img = new Image();
-  const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const svgBlob = new Blob([svgString], {
+    type: "image/svg+xml;charset=utf-8"
+  });
   const url = URL.createObjectURL(svgBlob);
 
   img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
+    canvas.width  = img.width  * scale;
+    canvas.height = img.height * scale;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Fondo blanco
+    if (background === "white") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.scale(scale, scale);
     ctx.drawImage(img, 0, 0);
 
     URL.revokeObjectURL(url);
@@ -316,93 +702,52 @@ document.getElementById("download-png").addEventListener("click", () => {
       const pngUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = pngUrl;
-      a.download = "simbolo_otan.png";
+      a.download = "simbolo_otan_4x.png";
       a.click();
       URL.revokeObjectURL(pngUrl);
-    });
+    }, "image/png");
   };
 
   img.src = url;
 });
 
+function resetSelectToPlaceholder(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
 
-
-
-
-
-
-
-
-function autoResizeSelectText(select, {
-  maxFont = 17,
-  minFont = 12,
-  padding = 30
-} = {}) {
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  const style = window.getComputedStyle(select);
-  const fontFamily = style.fontFamily;
-  const maxWidth = select.clientWidth - padding;
-
-  let fontSize = maxFont;
-  const text = select.options[select.selectedIndex]?.text || "";
-
-  while (fontSize >= minFont) {
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    const textWidth = ctx.measureText(text).width;
-
-    if (textWidth <= maxWidth) break;
-    fontSize--;
-  }
-
-  select.style.fontSize = fontSize + "px";
+  setTimeout(() => {
+    el.selectedIndex = 0;
+  }, 0);
 }
 
-/* Aplica SOLO a los selects de la columna derecha */
-document.querySelectorAll(".right-column select").forEach(select => {
 
-  // al cargar
-  autoResizeSelectText(select);
+function updateModifier1(value) {
+  // Normalizar: quitar espacios
+  const v = value.trim();
 
-  // al cambiar opción
-  select.addEventListener("change", () => {
-    autoResizeSelectText(select);
-  });
-});
-
-
-
-
-
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-
-    document.querySelectorAll(".tab").forEach(t =>
-      t.classList.remove("active")
-    );
-
-    document.querySelectorAll(".tab-content").forEach(c =>
-      c.classList.remove("active")
-    );
-
-    tab.classList.add("active");
-    document.getElementById(tab.dataset.tab).classList.add("active");
-  });
-});
-
-function actualizarIconoSIDC(iconCode) {
-  let sidc = sidcInput.value.trim();
-  if (!/^[0-9]{30}$/.test(sidc)) return;
-
-  let sidcArray = sidc.split("");
-
-  // Icono funcional: posiciones 10 a 15
-  for (let i = 0; i < 6; i++) {
-    sidcArray[10 + i] = iconCode[i];
+  // Si está vacío o no es de 2 dígitos → 00
+  if (!/^\d{2}$/.test(v)) {
+    SIDCModel.setTwoDigits(16, "00");
+  } else {
+    SIDCModel.setTwoDigits(16, v);
   }
 
-  sidcInput.value = sidcArray.join("");
-  dibujarSIDC();
+  syncSIDCToUI();
+  SymbolController.render();
+}
+
+
+function updateModifier2(value) {
+  // Normalizar: quitar espacios
+  const v = value.trim();
+
+  // Si está vacío o no es de 2 dígitos → 00
+  if (!/^\d{2}$/.test(v)) {
+    SIDCModel.setTwoDigits(18, "00");
+  } else {
+    SIDCModel.setTwoDigits(18, v);
+  }
+
+  syncSIDCToUI();
+  SymbolController.render();
 }
